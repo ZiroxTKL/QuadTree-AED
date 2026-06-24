@@ -1,0 +1,21 @@
+# Carpeta de compilacion (incluye raylib descargado por FetchContent)
+/build/
+/out/
+cmake-build-*/
+
+# Binarios y objetos
+*.exe
+*.dll
+*.o
+*.obj
+*.a
+*.lib
+
+# Archivos de CMake
+CMakeCache.txt
+CMakeFiles/
+
+# IDE
+.vs/
+.idea/
+*.user
