@@ -3,8 +3,8 @@
 
 Simulation::Simulation(float worldW, float worldH, int cap): W(worldW), H(worldH), capacity(cap) {}
 
-void Simulation::setParticles(std::vector<Particle> ps) {
-    parts = std::move(ps);
+void Simulation::setParticles(vector<Particle> ps) {
+    parts = move(ps);
     rebuildTree();
 }
 

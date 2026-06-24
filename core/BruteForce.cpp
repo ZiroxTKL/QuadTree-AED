@@ -17,6 +17,5 @@ vector<pair<int,int>> detectCollisions(const vector<Particle>& parts, Metrics& m
         }
     }
     return pairs;
-}
-
+    }
 }

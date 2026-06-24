@@ -13,10 +13,10 @@ public:
     bool insert(const Item& it);
     void clear();
 
-    void queryRange(const AABB& range, std::vector<int>& out, Metrics& m) const;
-    void queryRadius(Vec2 center, float radius, std::vector<int>& out, Metrics& m) const;
+    void queryRange(const AABB& range, vector<int>& out, Metrics& m) const;
+    void queryRadius(Vec2 center, float radius, vector<int>& out, Metrics& m) const;
 
-    void collectBoundaries(std::vector<AABB>& out) const;
+    void collectBoundaries(vector<AABB>& out) const;
 
 private:
     void subdivide();
@@ -25,6 +25,6 @@ private:
     int  capacity;
     int  maxDepth, depth;
     bool divided = false;
-    std::vector<Item> points;
-    std::unique_ptr<QuadTree> nw, ne, sw, se;
+    vector<Item> points;
+    unique_ptr<QuadTree> nw, ne, sw, se;
 };
