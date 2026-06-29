@@ -1,3 +1,4 @@
-//
-// Created by DoubleEdge on 28/06/2026.
-//
+#include "utils/Logger.hpp"
+
+// Logger es header-only (singleton). Unidad de traducción de respaldo.
+namespace qt {}

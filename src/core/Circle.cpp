@@ -1,3 +1,4 @@
-//
-// Created by DoubleEdge on 28/06/2026.
-//
+#include "core/Circle.hpp"
+
+// Circle tiene toda su lógica inline en el header.
+namespace qt {}

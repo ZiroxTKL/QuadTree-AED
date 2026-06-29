@@ -1,3 +1,4 @@
-//
-// Created by DoubleEdge on 28/06/2026.
-//
+#include "core/Particle.hpp"
+
+// Particle es un POD con helpers inline en el header.
+namespace qt {}

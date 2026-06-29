@@ -1,0 +1,20 @@
+{
+  "n": 5000,
+  "width": 1000,
+  "height": 1000,
+  "capacity": 4,
+  "max_depth": 16,
+  "radius_min": 3,
+  "radius_max": 6,
+  "speed_min": 20,
+  "speed_max": 80,
+  "distribution": "uniform",
+  "num_clusters": 5,
+  "cluster_std": 40,
+  "dense_fraction": 0.6,
+  "dense_size": 0.15,
+  "dt": 0.0166667,
+  "frames": 300,
+  "query_radius": 30,
+  "seed": 42
+}

@@ -1,8 +1,23 @@
-//
-// Created by DoubleEdge on 28/06/2026.
-//
+#pragma once
+#include "core/Particle.hpp"
+#include "simulation/Collision.hpp"
+#include <vector>
+#include <cstdint>
 
-#ifndef QUADTREE_BRUTEFORCE_H
-#define QUADTREE_BRUTEFORCE_H
+namespace qt {
 
-#endif //QUADTREE_BRUTEFORCE_H
+    // Solución de fuerza bruta contra la cual se compara el QuadTree.
+    // Revisa todos los pares posibles -> O(n^2).
+    class BruteForce {
+    public:
+        // Detecta colisiones comparando cada par exactamente una vez.
+        static CollisionResult detectCollisions(const std::vector<Particle>& particles);
+
+        // Consulta de vecinos a un punto: recorre todas las partículas.
+        static std::vector<const Particle*> queryNeighbors(
+            const std::vector<Particle>& particles,
+            double x, double y, double radius,
+            int64_t& comparisons);
+    };
+
+} // namespace qt

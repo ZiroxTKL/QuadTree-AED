@@ -1,3 +1,4 @@
-//
-// Created by DoubleEdge on 28/06/2026.
-//
+#include "benchmark/Statistics.hpp"
+
+// Statistics es header-only. Unidad de traducción de respaldo.
+namespace qt {}
