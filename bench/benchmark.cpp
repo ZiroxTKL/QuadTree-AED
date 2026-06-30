@@ -6,6 +6,7 @@
 #include <utility>
 #include <string>
 #include <cstdlib>
+#include <filesystem>
 #include "Simulation.h"
 #include "BruteForce.h"
 #include "Distribution.h"
@@ -31,7 +32,8 @@ struct Avg {
 int main(int argc, char** argv) {
     int repeats = 5;
     if (argc > 1) repeats = max(1, atoi(argv[1]));
-    string csvPath = (argc > 2) ? argv[2] : "benchmark_resultados.csv";
+    std::filesystem::create_directories("docs");
+    string csvPath = (argc > 2) ? argv[2] : "docs/benchmark_resultados.csv";
 
     const float W = 1000, H = 1000;
     const int   capacity = 8;
@@ -139,6 +141,8 @@ int main(int argc, char** argv) {
     }
 
     csv.close();
-    cout << "CSV guardado en: " << csvPath << "\n";
+    cout << "CSV guardado en: "
+     << std::filesystem::absolute(csvPath)
+     << "\n";
     return 0;
 }
