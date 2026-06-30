@@ -2,6 +2,7 @@
 #include <vector>
 #include <utility>
 #include <unordered_set>
+#include <string>
 #include "raylib.h"
 #include "Simulation.h"
 #include "Metrics.h"
@@ -25,6 +26,8 @@ public:
               bool                           simPaused);
 
     bool windowShouldClose() const { return WindowShouldClose(); }
+
+    void setConfig(const std::string& dist, int n, int capacity, unsigned seed);
 
 private:
     Vector2 toScreen(float wx, float wy)   const;
@@ -64,4 +67,9 @@ private:
 
     std::unordered_set<int> candidateSet;
     Metrics manualQueryMetrics;
+
+    std::string cfgDist = "Uniforme";
+    int         cfgN    = 0;
+    int         cfgCap  = 0;
+    unsigned    cfgSeed = 0;
 };

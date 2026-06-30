@@ -7,7 +7,7 @@ bruta (O(n²))**. Incluye un visualizador interactivo (raylib) y un benchmark de
 ---
 
 ## 1. Estructura del proyecto
-
+  
 ```
 core/                 núcleo algorítmico (sin dependencias gráficas)
   Vec2.h              vector 2D
