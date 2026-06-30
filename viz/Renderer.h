@@ -18,6 +18,13 @@ public:
     ~Renderer();
 
     void handleInput(const Simulation& sim);
+    void resetQuery();
+    void setWorldSize(float worldW, float worldH);
+    void setScenarioInfo(const std::string& distribution,
+                         int capacity,
+                         float minRadius,
+                         float maxRadius,
+                         float maxSpeed);
 
     void draw(const Simulation&              sim,
               const std::vector<std::pair<int,int>>& liveCollisions,
@@ -26,8 +33,6 @@ public:
               bool                           simPaused);
 
     bool windowShouldClose() const { return WindowShouldClose(); }
-
-    void setConfig(const std::string& dist, int n, int capacity, unsigned seed);
 
 private:
     Vector2 toScreen(float wx, float wy)   const;
@@ -68,8 +73,9 @@ private:
     std::unordered_set<int> candidateSet;
     Metrics manualQueryMetrics;
 
-    std::string cfgDist = "Uniforme";
-    int         cfgN    = 0;
-    int         cfgCap  = 0;
-    unsigned    cfgSeed = 0;
+    std::string distributionName = "Uniforme";
+    int scenarioCapacity = 8;
+    float scenarioMinRadius = 3.f;
+    float scenarioMaxRadius = 6.f;
+    float scenarioMaxSpeed = 80.f;
 };

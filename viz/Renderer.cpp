@@ -6,6 +6,9 @@
 #include <iomanip>
 #include <string>
 
+// ============================================================
+//  Colores que se uso
+// ============================================================
 static constexpr Color C_BG = {12, 12, 22, 255};
 static constexpr Color C_VP_BG = {8, 8, 18, 255};
 static constexpr Color C_BORDER = {55, 55, 90, 255};
@@ -55,9 +58,10 @@ Renderer::Renderer(int wW, int wH, float wldW, float wldH)
     : winW(wW), winH(wH), worldW(wldW), worldH(wldH)
 {
 
+    // Reservar un viewport cuadrado a la izquierda (la altura depende del alto de la ventana menos el margen)
     const int margin = 10;
     vpH = winH - 2 * margin;
-    vpW = vpH;
+    vpW = vpH; // cuadrado para conservar la proporción del mundo (1000×1000)
     vpX = margin;
     vpY = margin;
 
@@ -66,7 +70,7 @@ Renderer::Renderer(int wW, int wH, float wldW, float wldH)
 
     SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(winW, winH, "Simulador de partículas con QuadTree | [R] Rectángulo [C] Círculo [SPACE] Pausar [Q] Bordes [H] Ayuda");
-    SetTargetFPS(60);
+    SetTargetFPS(180);
 }
 
 Renderer::~Renderer()
@@ -74,12 +78,32 @@ Renderer::~Renderer()
     CloseWindow();
 }
 
-void Renderer::setConfig(const std::string &dist, int n, int capacity, unsigned seed)
+void Renderer::resetQuery()
 {
-    cfgDist = dist;
-    cfgN    = n;
-    cfgCap  = capacity;
-    cfgSeed = seed;
+    qMode = QueryMode::None;
+    qState = QueryState::Idle;
+    candidateSet.clear();
+    manualQueryMetrics.reset();
+}
+
+void Renderer::setWorldSize(float wW, float wH)
+{
+    worldW = wW;
+    worldH = wH;
+    resetQuery();
+}
+
+void Renderer::setScenarioInfo(const std::string& distribution,
+                               int capacity,
+                               float minRadius,
+                               float maxRadius,
+                               float maxSpeed)
+{
+    distributionName = distribution;
+    scenarioCapacity = capacity;
+    scenarioMinRadius = minRadius;
+    scenarioMaxRadius = maxRadius;
+    scenarioMaxSpeed = maxSpeed;
 }
 
 Vector2 Renderer::toScreen(float wx, float wy) const
@@ -105,13 +129,18 @@ bool Renderer::inViewport(Vector2 p) const
            p.y >= vpY && p.y <= vpY + vpH;
 }
 
+// ============================================================
+//  Input
+// ============================================================
 void Renderer::handleInput(const Simulation &sim)
 {
+    // --- Alternar modos ---
     if (IsKeyPressed(KEY_Q))
         showBounds = !showBounds;
     if (IsKeyPressed(KEY_H))
         showHelp = !showHelp;
 
+    // Cambiar a consulta rectangular
     if (IsKeyPressed(KEY_R))
     {
         qMode = (qMode == QueryMode::Rect) ? QueryMode::None : QueryMode::Rect;
@@ -119,6 +148,7 @@ void Renderer::handleInput(const Simulation &sim)
         candidateSet.clear();
         manualQueryMetrics.reset();
     }
+    // Cambiar a consulta circular
     if (IsKeyPressed(KEY_C))
     {
         qMode = (qMode == QueryMode::Circle) ? QueryMode::None : QueryMode::Circle;
@@ -126,6 +156,7 @@ void Renderer::handleInput(const Simulation &sim)
         candidateSet.clear();
         manualQueryMetrics.reset();
     }
+    // Salir de cualquier consulta
     if (IsKeyPressed(KEY_ESCAPE))
     {
         qMode = QueryMode::None;
@@ -134,12 +165,14 @@ void Renderer::handleInput(const Simulation &sim)
         manualQueryMetrics.reset();
     }
 
+    // --- Execute active query mode ---
     if (qMode == QueryMode::Rect)
         updateRectQuery(sim);
     if (qMode == QueryMode::Circle)
         updateCircleQuery(sim);
 }
 
+// poligono o rectangulo: arrastra para definir un AABB; la consulta se ejecuta al soltar el botón
 void Renderer::updateRectQuery(const Simulation &sim)
 {
     Vector2 mouse = GetMousePosition();
@@ -180,6 +213,7 @@ void Renderer::updateRectQuery(const Simulation &sim)
     }
 }
 
+// circulo: arrastra desde el centro hacia afuera; la consulta se actualiza en tiempo real
 void Renderer::updateCircleQuery(const Simulation &sim)
 {
     Vector2 mouse = GetMousePosition();
@@ -226,6 +260,7 @@ void Renderer::draw(const Simulation &sim,
                     bool simPaused)
 {
 
+    // Crear el conjunto de IDs de partículas en colisión para búsquedas O(1) durante el dibujo
     std::unordered_set<int> colliderSet;
     colliderSet.reserve(liveCollisions.size() * 2);
     for (const auto &[a, b] : liveCollisions)
@@ -237,21 +272,28 @@ void Renderer::draw(const Simulation &sim,
     BeginDrawing();
     ClearBackground(C_BG);
 
+    // 1. Fondo del viewport
     DrawRectangle(vpX, vpY, vpW, vpH, C_VP_BG);
 
+    // Limitar todo el dibujo del mundo al rectángulo del viewport
     BeginScissorMode(vpX, vpY, vpW, vpH);
 
+    // 2. Límites de las celdas del QuadTree
     if (showBounds)
         drawQuadTreeBounds(sim.tree());
 
+    // 3. Superposición de la región de consulta del usuario (detrás de las partículas para mayor claridad)
     drawQueryRegion();
 
+    // 4. Partículas (el color depende del estado: normal / candidata / colisionadora)
     drawParticles(sim.particles(), candidateSet, colliderSet);
 
     EndScissorMode();
 
+    // 5. Borde del viewport arriba (sin recorte)
     drawViewportBorder();
 
+    // 6. Barra lateral del HUD
     drawHUD(sim, qtM, bfM, (int)liveCollisions.size(), simPaused);
 
     EndDrawing();
@@ -302,6 +344,7 @@ void Renderer::drawQueryRegion()
         float r = std::sqrt(dx * dx + dy * dy);
         DrawCircle((int)dragStart.x, (int)dragStart.y, r, C_CIRC_FILL);
         DrawCircleLines((int)dragStart.x, (int)dragStart.y, r, C_CIRC_LINE);
+        // Cross-hair at center
         DrawLine((int)dragStart.x - 6, (int)dragStart.y,
                  (int)dragStart.x + 6, (int)dragStart.y, C_CIRC_LINE);
         DrawLine((int)dragStart.x, (int)dragStart.y - 6,
@@ -318,6 +361,7 @@ void Renderer::drawParticles(const std::vector<Particle> &parts,
         Vector2 sc = toScreen((float)p.x, (float)p.y);
         float sr = std::max(1.5f, toScreenLen((float)p.radius));
 
+        // Prioridad: colisionadora > candidata > normal
         Color fill = C_PARTICLE;
         if (colliders.count(p.id))
             fill = C_COLLIDER;
@@ -326,6 +370,7 @@ void Renderer::drawParticles(const std::vector<Particle> &parts,
 
         DrawCircleV(sc, sr, fill);
 
+        // Borde oscuro sutil para que las partículas superpuestas se distingan mejor
         Color outline = {(unsigned char)(fill.r / 3),
                          (unsigned char)(fill.g / 3),
                          (unsigned char)(fill.b / 3), 160};
@@ -333,6 +378,9 @@ void Renderer::drawParticles(const std::vector<Particle> &parts,
     }
 }
 
+// ============================================================
+//  HUD sidebar
+// ============================================================
 void Renderer::drawHUD(const Simulation &sim,
                        const Metrics &qtM,
                        const Metrics &bfM,
@@ -340,6 +388,7 @@ void Renderer::drawHUD(const Simulation &sim,
                        bool paused)
 {
 
+    // Fondo de la barra lateral
     DrawRectangle(hudX - 4, 0, hudW + 8, winH, C_HUD_BG);
 
     const int x = hudX + 4;
@@ -349,12 +398,14 @@ void Renderer::drawHUD(const Simulation &sim,
     const int secGap = 10;
     int y = 12;
 
+    // Helpers como lambdas (capturan por referencia)
     auto sep = [&]()
     {
         DrawLine(x, y, x + hudW - 8, y, C_HUD_SEP);
         y += secGap;
     };
 
+    // "Etiqueta: valor" en la misma línea
     auto kv = [&](const char *label, const char *value, Color valCol)
     {
         DrawText(label, x, y, fsTxt, C_TXT_DIM);
@@ -369,6 +420,7 @@ void Renderer::drawHUD(const Simulation &sim,
         y += lineH;
     };
 
+    // ---- tituloo ----
     DrawText("Visualizador de QuadTree", x, y, 16, C_TXT);
     y += 22;
     if (paused)
@@ -378,18 +430,7 @@ void Renderer::drawHUD(const Simulation &sim,
     }
     sep();
 
-    section("Configuracion");
-    char cbuf[64];
-    kv("Distribucion:", cfgDist.c_str(), C_TXT_PURPLE);
-    snprintf(cbuf, sizeof(cbuf), "%d", cfgN);
-    kv("Particulas (n):", cbuf, C_TXT);
-    snprintf(cbuf, sizeof(cbuf), "%d", cfgCap);
-    kv("Capacidad/nodo:", cbuf, C_TXT);
-    snprintf(cbuf, sizeof(cbuf), "%u", cfgSeed);
-    kv("Semilla:", cbuf, C_TXT_DIM);
-    y += secGap;
-    sep();
-
+    // ---- Rendimiento ----
     section("Rendimiento");
     int fps = GetFPS();
     char buf[64];
@@ -401,18 +442,30 @@ void Renderer::drawHUD(const Simulation &sim,
     y += secGap;
     sep();
 
+    // ---- simulacino ----
     section("Simulación");
     snprintf(buf, sizeof(buf), "%d", (int)sim.particles().size());
     kv("Partículas:", buf, C_TXT);
+
+    kv("Distribucion:", distributionName.c_str(), C_TXT_BLUE);
+    snprintf(buf, sizeof(buf), "%.0fx%.0f", worldW, worldH);
+    kv("Espacio:", buf, C_TXT);
+    snprintf(buf, sizeof(buf), "%d", scenarioCapacity);
+    kv("Capacidad QT:", buf, C_TXT);
+    snprintf(buf, sizeof(buf), "%.1f-%.1f", scenarioMinRadius, scenarioMaxRadius);
+    kv("Radios:", buf, C_TXT);
+    snprintf(buf, sizeof(buf), "%.0f", scenarioMaxSpeed);
+    kv("Vel. max:", buf, C_TXT);
 
     snprintf(buf, sizeof(buf), "%d pares", collisionCount);
     kv("Colisiones:", buf, collisionCount > 0 ? C_TXT_RED : C_TXT);
     y += secGap;
     sep();
 
-
+    // ---- Comparaciones en vivo: QT vs BF ----
     section("Comparaciones en vivo (por fotograma)");
 
+    // Columna de QuadTree
     DrawText("QuadTree", x, y, fsTxt, C_TXT_BLUE);
     y += lineH - 2;
     kv("  Comparaciones:", abbrev(qtM.comparisons).c_str(), C_TXT_GREEN);
@@ -420,6 +473,7 @@ void Renderer::drawHUD(const Simulation &sim,
     kv("  Candidatos:", abbrev(qtM.candidates).c_str(), C_TXT);
     y += 4;
 
+    // Columna de Fuerza bruta
     DrawText("Fuerza bruta", x, y, fsTxt, {255, 140, 60, 255});
     y += lineH - 2;
     if (bfM.comparisons > 0)
@@ -429,11 +483,13 @@ void Renderer::drawHUD(const Simulation &sim,
     else
     {
         kv("  Comparaciones:", "N > 3000 (est.)", C_TXT_DIM);
+        // Estimación teórica O(n²/2)
         long long n = (long long)sim.particles().size();
         kv("  Teórico:", abbrev(n * (n - 1) / 2).c_str(), {180, 80, 80, 255});
     }
     y += 6;
 
+    // Insignia de aceleración
     if (bfM.comparisons > 0 && qtM.comparisons > 0)
     {
         float ratio = (float)bfM.comparisons / (float)(qtM.comparisons > 0 ? qtM.comparisons : 1);
@@ -446,6 +502,7 @@ void Renderer::drawHUD(const Simulation &sim,
     y += secGap;
     sep();
 
+    // ---- Resultados de consulta manual ----
     if (qMode != QueryMode::None)
     {
         section("Consulta manual");
@@ -462,6 +519,7 @@ void Renderer::drawHUD(const Simulation &sim,
             kv("Nodos visitados:", abbrev(manualQueryMetrics.nodesVisited).c_str(), C_TXT_DIM);
         }
 
+        // Indicador de estado
         const char *stateStr = "";
         if (qState == QueryState::Idle)
             stateStr = "Dibuja el área.";
@@ -475,6 +533,7 @@ void Renderer::drawHUD(const Simulation &sim,
         sep();
     }
 
+    // ---- Leyenda ----
     section("Leyenda");
     auto legend = [&](Color dot, const char *label)
     {
@@ -486,6 +545,7 @@ void Renderer::drawHUD(const Simulation &sim,
     legend(C_CANDIDATE, "Dentro de la región de consulta");
     legend(C_COLLIDER, "Colisión detectada");
 
+    // Muestra de límites del QuadTree
     DrawRectangle(x + 1, y + 3, 13, 10, C_BOUNDS);
     DrawRectangleLinesEx({(float)x + 1, (float)y + 3, 13, 10}, 1.f, C_TXT_DIM);
     DrawText("Celda de QuadTree", x + 18, y, fsTxt, C_TXT);
@@ -493,6 +553,7 @@ void Renderer::drawHUD(const Simulation &sim,
     y += secGap;
     sep();
 
+    // ---- Controles ----
     if (showHelp)
     {
         section("Controles");
@@ -506,12 +567,15 @@ void Renderer::drawHUD(const Simulation &sim,
         key("[R]", " Consulta con rectangulo");
         key("[C]", " Consulta con circulo");
         key("[Q]", " Alternar bordes de QT");
-        key("[1/2/3]", " Distribucion Unif/Clust/Densa");
-        key("[G]", " Nueva semilla (regenerar)");
-        key("[+/-]", " Mas / menos particulas");
-        key("[ [ / ] ]", " Capacidad de nodo  -/+");
         key("[SPACE]", " Pausar / Reanudar");
         key("[H]", " Ocultar los controles");
+        key("[1][2][3]", " Uniforme / clusters / alta densidad");
+        key("[N]", " Cambiar cantidad de particulas");
+        key("[M]", " Cambiar tamano del mundo");
+        key("[K]", " Cambiar capacidad del QT");
+        key("[T]", " Cambiar rango de radios");
+        key("[V]", " Cambiar velocidad maxima");
+        key("[ENTER]", " Regenerar escenario");
         key("[ESC]", " Salir del programa");
     }
     else
